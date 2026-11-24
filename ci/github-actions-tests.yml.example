@@ -1,0 +1,17 @@
+name: Hardware-free tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3-pytest python3-numpy python3-scipy python3-yaml g++ ros-humble-ur-robot-driver ros-humble-ur-moveit-config ros-humble-xacro
+      - name: Test without hardware
+        shell: bash
+        run: ./scripts/test.sh

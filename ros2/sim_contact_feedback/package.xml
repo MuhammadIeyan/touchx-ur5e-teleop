@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>sim_contact_feedback</name><version>0.1.0</version>
+  <description>Read-only MuJoCo tool contact feedback for domain 42.</description>
+  <maintainer email="maintainer@example.com">Teleop maintainers</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>mujoco_ros2_control_plugins</depend><depend>geometry_msgs</depend>
+  <depend>rclcpp</depend><depend>pluginlib</depend><depend>mujoco_vendor</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

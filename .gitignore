@@ -1,0 +1,31 @@
+# Generated outputs and local evidence
+/build/
+/install/
+/log/
+/diagnostics/
+/.local-tools/
+/.vscode/
+/.agents/
+/.codex/
+/.aws/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+# Device-specific records and credentials
+/calibration/*.yaml
+/config/real_robot_commissioning.json
+.env
+.env.*
+*.pem
+*.key
+*.bag
+*.db3
+*.mcap
+core
+core.*
+
+# Proprietary SDK examples and native build artifacts
+/tests/QueryDevice/
+*.so
+*.o

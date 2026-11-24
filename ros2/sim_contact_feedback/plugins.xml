@@ -1,0 +1,3 @@
+<library path="sim_contact_feedback">
+  <class name="sim_contact_feedback/ToolContact" type="sim_contact_feedback::ToolContact" base_class_type="mujoco_ros2_control_plugins::MuJoCoROS2ControlPluginBase"/>
+</library>

@@ -1,0 +1,22 @@
+{
+  "stage": "uncommissioned",
+  "robot_type": "ur5e",
+  "ros_domain_id": 43,
+  "robot_ipv4": "192.168.1.103",
+  "computer_wired_ipv4": "192.168.1.10",
+  "expected_calibration_hash": "REPLACE_WITH_YOUR_ROBOT_CALIBRATION_HASH",
+  "reported_payload_mass_kg": 0.0,
+  "reported_payload_cog_mm": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "payload_verified": false,
+  "mounting_configuration_verified": false,
+  "calibration_match_verified": false,
+  "minimum_clearance_mm": 0,
+  "external_control_host_confirmed": false,
+  "tcp_verified": false,
+  "robot_side_stop_verified": false,
+  "wrench_usable_for_feedback": false
+}
