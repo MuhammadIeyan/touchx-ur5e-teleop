@@ -43,8 +43,8 @@ class Clutch:
 
     def __init__(self, scale=0.2, rot_scale=1.0, mode='position',
                  deadband=0.003, max_linear_speed=0.08, rate_gain=2.5):
-        if not np.isfinite(scale) or not 0<scale<=1 or not np.isfinite(rot_scale) or not 0<=rot_scale<=1:
-            raise ValueError("Scales must be finite; translation in (0,1], rotation in [0,1]")
+        if not np.isfinite(scale) or not 0<scale<=20 or not np.isfinite(rot_scale) or not 0<=rot_scale<=1:
+            raise ValueError("Scales must be finite; translation in (0,5], rotation in [0,1]")
         if mode not in ('position', 'rate'):
             raise ValueError("Mode must be 'position' or 'rate'")
         self.scale = scale

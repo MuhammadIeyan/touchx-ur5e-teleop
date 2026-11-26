@@ -6,6 +6,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Exec
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -14,6 +15,7 @@ def generate_launch_description():
     root = Path(__file__).resolve().parents[1]
     return LaunchDescription([
         DeclareLaunchArgument('headless', default_value='false'),
+        DeclareLaunchArgument('rviz', default_value='false', description='Show RViz simulation scene'),
         DeclareLaunchArgument('execute', default_value='false', description='Enable simulated clutch control'),
         DeclareLaunchArgument('device', default_value='true', description='Start Touch hardware bridge (forces require opt-in)'),
         DeclareLaunchArgument('force_feedback', default_value='false', description='Permit bounded Touch motor output while deadman held'),
@@ -29,6 +31,12 @@ def generate_launch_description():
                                  launch_arguments={'mujoco_model': 'ur5e_grasper.xml',
                                                    'headless': LaunchConfiguration('headless'),
                                                    'plugins_file': str(root/'config/touch_x_plugins.yaml')}.items()),
+        Node(package='rviz2', executable='rviz2', name='rviz2',
+             arguments=['-d', str(root/'config/touch_x_sim.rviz')],
+             parameters=[{'use_sim_time': True}],
+             condition=IfCondition(LaunchConfiguration('rviz')), output='screen'),
+        ExecuteProcess(cmd=['python3', str(root/'scripts/sim_rviz_scene.py')],
+                       condition=IfCondition(LaunchConfiguration('rviz')), output='screen'),
         ExecuteProcess(cmd=['python3', str(root/'scripts/command_router.py'), '--ros-args',
                             '-p', 'require_deadman:=true'], output='screen'),
         ExecuteProcess(cmd=['python3', str(root/'scripts/touch_x_publisher.py'),

@@ -11,6 +11,8 @@ Close Touch Setup/Diagnostic. Connect Touch X USB and power. Build the local con
 ./scripts/run_touch_x_sim.sh
 ```
 
+Also rebuild after updating the MuJoCo/ROS packages, with the simulation stopped. An outdated plugin binary can appear loaded while `/simulation/tool_contact` has no publisher, leaving teleop at `touch_graph=False`. The build script performs a clean rebuild to avoid stale objects after package updates. Before pressing the button, wait for `READY: Simulation teleop active`.
+
 The default starts the MuJoCo viewer and read-only Touch tracking. Enable simulated motion explicitly:
 
 ```bash
@@ -44,6 +46,28 @@ These are command limits, not guaranteed measured motion speeds. The original la
 Force gain 1 uses the power-conjugate mapping. Gain 2 intentionally exaggerates feedback for perception; it is not a calibrated representation of tissue force. The 2 N/s ramp and 5 mJ energy budget are unchanged, so actual commanded output can be below the cap. No contact still means no contact feedback. These settings are not approved surgical parameters; use finer motion for delicate tasks and evaluate precision, overshoot, collision forces and delay before choosing task-specific settings.
 
 `headless:=true` runs without a viewer. Never run multiple stacks concurrently. Stop with Ctrl-C. A driver communication stall requires disconnecting USB and power before retrying. The supported standalone reader is `scripts/run_touch_x.sh`; it defaults to forces disabled.
+
+## RViz view
+
+Stop the previous simulation stack, then run:
+
+```bash
+./scripts/run_touch_x_rviz.sh
+# With bounded Touch motor output from MuJoCo contacts:
+./scripts/run_touch_x_rviz.sh force_feedback:=true
+```
+
+Choose one command. This launcher starts headless MuJoCo, RViz, Touch input and simulated motion on domain 42. It does not start a physical driver. Wait for READY, release the button once, then hold it to move. Forces are off by default. Ctrl+C in the launch terminal stops the stack; closing RViz alone only closes the view.
+
+RViz displays `/robot_description` and TF for the robot, and `/simulation/scene` for the grasper, tip and environment. The read-only `sim_rviz_scene.py` computes marker poses from the same MuJoCo model and `/joint_states`; it has no command or force publisher. The simulation URDF world rotation matches Menagerie. Its rounded nominal link dimensions agree within 2 mm in the regression poses; this is a visualization, not physical TCP calibration. MuJoCo still computes dynamics and contacts; RViz is the viewer.
+
+For the responsive preset with RViz instead of the MuJoCo window:
+
+```bash
+./scripts/run_touch_x_sim_responsive.sh rviz:=true headless:=true
+```
+
+This preset enables Touch force output. Do not run it alongside another stack.
 
 ## Feedback and interlocks
 

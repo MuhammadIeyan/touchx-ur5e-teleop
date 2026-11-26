@@ -35,6 +35,10 @@ class HoldGesture:
         return held,request
 
 
+class JointDynamicsLimit(ValueError):
+    """A candidate violates the unchanged joint velocity/acceleration bounds."""
+
+
 class Quintic:
     """Preserve incoming q/v/a, end at target with zero velocity/acceleration."""
     def __init__(self,q,v,a,end,duration=.30):
@@ -70,21 +74,24 @@ class Quintic:
             travel+=np.abs(np.diff(positions)).sum()
         return travel
 
-    def validate(self,model,origin,orientation,workspace_m):
+    def validate(self,model,origin,orientation,workspace_m,*,max_cartesian_speed=.012):
         from scipy.spatial.transform import Rotation
+        if not np.isfinite(max_cartesian_speed) or not .001<=max_cartesian_speed<=.050:
+            raise ValueError('Physical speed must be 1–50 mm/s')
         times=np.linspace(0,self.duration,31)
         states=[self.sample(t) for t in times]
+        if any(np.max(np.abs(v))>.08 or np.max(np.abs(a))>.8 for _,v,a in states):
+            raise JointDynamicsLimit('Joint rate/acceleration limit')
         xyz=[]
         for q,v,a in states:
             if np.any(q<model.lower+.01) or np.any(q>model.upper-.01):raise ValueError('Joint limit')
-            if np.max(np.abs(v))>.08 or np.max(np.abs(a))>.8:raise ValueError('Joint rate/acceleration limit')
             pose=model.fk(q);xyz.append(pose[:3,3])
             if np.linalg.norm(pose[:3,3]-origin)>workspace_m+1e-6:raise ValueError('Workspace boundary')
             if np.linalg.norm(Rotation.from_matrix(pose[:3,:3]@orientation.T).as_rotvec())>.005:
                 raise ValueError('Orientation bound')
         xyz=np.array(xyz)
         if np.max(np.linalg.norm(xyz-xyz[0],axis=1))>.002:raise ValueError('Outstanding motion exceeds 2 mm')
-        if np.max(np.linalg.norm(np.diff(xyz,axis=0)/(times[1]-times[0]),axis=1))>.012:
+        if np.max(np.linalg.norm(np.diff(xyz,axis=0)/(times[1]-times[0]),axis=1))>max_cartesian_speed:
             raise ValueError('Cartesian speed bound')
         return states
 

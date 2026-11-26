@@ -3,7 +3,8 @@ import time
 import numpy as np
 from real_robot.bench_motion import Model
 from real_robot.path_geometry import PathGeometry
-from real_robot.smooth_control import Quintic
+from real_robot.smooth_control import Quintic, JointDynamicsLimit
+from real_robot.motion_profile import MotionProfile
 
 _model = _geometry = None
 
@@ -18,16 +19,28 @@ def initialize(xml, calibration_hash, robot_ip, initial_q):
 
 def build_plan(model, geometry, request):
     started = time.monotonic()
+    profile = MotionProfile(request.get('speed_mm_s', 12.0))
     q, v, a = request['reference']
     delta = request['target'] - model.fk(q)[:3, 3]
     distance = np.linalg.norm(delta)
     end = q.copy() if distance < 1e-9 else model.plan(
         q, delta, orientation=request['origin'][:3, :3],
-        step_m=min(distance, .0015))[0]
-    curve = Quintic(q, v, a, end)
-    curve.validate(model, request['origin'][:3, 3], request['origin'][:3, :3], request['workspace_m'])
+        step_m=min(distance, profile.endpoint_step_m))[0]
+    # Speed is a ceiling: try longer horizons when this pose cannot satisfy
+    # joint dynamics at the requested timing. Preserve incoming derivatives,
+    # endpoint, all bounds and the exact duration sent to the controller.
+    durations = [profile.duration_s] + [t for t in (.225, .3, .4, .5) if t > profile.duration_s]
+    for index, duration in enumerate(durations):
+        curve = Quintic(q, v, a, end, duration=duration)
+        try:
+            curve.validate(model, request['origin'][:3, 3], request['origin'][:3, :3], request['workspace_m'],
+                           max_cartesian_speed=profile.speed_m_s)
+            break
+        except JointDynamicsLimit:
+            if index == len(durations)-1:
+                raise
     geometry.curve(curve)
-    return dict(end=end, planning_s=time.monotonic()-started)
+    return dict(end=end, duration_s=curve.duration, planning_s=time.monotonic()-started)
 
 
 def plan(request):

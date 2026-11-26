@@ -17,6 +17,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 from controller_manager_msgs.srv import ListControllers, SwitchController
+from real_robot.motion_profile import MotionProfile
 
 CONTROLLER = 'scaled_joint_trajectory_controller'
 LEASE_S = .25
@@ -144,8 +145,11 @@ def main():
     p.add_argument('--step-mm',type=float,default=None,help='Deprecated: smooth control does not execute fixed-size steps')
     p.add_argument('--budget-mm',type=float,default=100.0,help='Fixed session workspace radius in mm (never auto-rebased)')
     p.add_argument('--scale',type=float,default=.75,help='Robot/hand displacement ratio')
+    p.add_argument('--speed-mm-s',type=float,default=12.,help='Physical speed setting, 1–50 mm/s')
     p.add_argument('--mode',choices=['position'],default='position',help='Direct clutched position tracking')
     args,extra=p.parse_known_args()
+    try:MotionProfile(args.speed_mm_s)
+    except ValueError as error:p.error(str(error))
     if not args.segmented and not args.session:p.error('Fault tests require --session')
     if args.segmented and args.step_mm is not None:
         print('Ignoring legacy --step-mm: smooth tracking uses bounded rolling trajectories.',flush=True)
@@ -157,7 +161,7 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     output=root/'diagnostics/real-robot'/time.strftime('guard-%Y%m%d-%H%M%S.jsonl')
     with output.open('x') as record:
-        command=([sys.executable,'-m','real_robot.continuous','--budget-mm',str(args.budget_mm),'--mode',args.mode,'--scale',str(args.scale)]+extra if args.segmented else
+        command=([sys.executable,'-m','real_robot.continuous','--budget-mm',str(args.budget_mm),'--mode',args.mode,'--scale',str(args.scale),'--speed-mm-s',str(args.speed_mm_s)]+extra if args.segmented else
                  [sys.executable,'-m','real_robot.bench_fault_test','--fault','sigkill','--session',args.session]+extra)
         child=subprocess.Popen(command,env=env,pass_fds=(writer,))
         os.close(writer)

@@ -21,6 +21,7 @@ After installing the dependencies and configuring your Touch X:
 
 ```bash
 ./scripts/build_sim_feedback.sh
+./scripts/run_touch_x_rviz.sh                        # RViz + headless physics, simulated motion
 ./scripts/run_touch_x_sim.sh                         # tracking only
 ./scripts/run_touch_x_sim.sh execute:=true           # simulated motion
 ./scripts/run_touch_x_sim.sh execute:=true force_feedback:=true
@@ -46,6 +47,8 @@ With the workspace clear and pendant Stop available, start the intended External
 ```
 
 Release once, hold the single button to engage, move gently, and release to cancel/reposition. The workspace stays centered on the starting pose; it does not reset on each press. The older `run_ur5e_touch_50mm.sh` entry point retains a 50 mm radius and 0.5 scale.
+
+Both launchers accept `--speed-mm-s 15` to adjust trajectory timing and the nominal Cartesian speed ceiling (default 12; range 1–50 mm/s). This is separate from displacement `--scale`. Adjustable speed has offline test coverage only; see [physical control limits](docs/SMOOTH_PHYSICAL_CONTROL.md).
 
 The driver starts motion controllers inactive. The command launcher verifies calibrated hardware, payload, current state and the local clock-corrected trajectory plugin before activation. No launcher presses pendant Play, powers the robot or releases brakes.
 

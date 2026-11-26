@@ -24,9 +24,19 @@ Hold for 0.25 s to engage; continue holding to track; release to cancel and repo
 
 ## Limits and timing
 
-- Workspace radius: `--budget-mm`, 10–200 mm; general default 100 mm.
-- Translation ratio: `--scale`, 0.1–1.0; general default 0.75.
-- Nominal speed cap remains 12 mm/s; joint speed 0.08 rad/s and acceleration 0.8 rad/s².
+Select trajectory speed independently of hand displacement gain:
+
+```bash
+./scripts/run_ur5e_touch_50mm.sh --speed-mm-s 15
+```
+
+`--speed-mm-s` defaults to 12 and accepts 1–50. Stop the current teleop launcher with Ctrl+C and verify controller deactivation before restarting with a new setting. No rebuild is required. `--scale` changes requested robot displacement per hand displacement; `--budget-mm` changes the workspace radius. Neither is a velocity setting.
+
+The speed argument sets the nominal Cartesian speed ceiling and adjusts the trajectory horizon: 300 ms at 12 mm/s and 180 ms at 20 mm/s, with a 150 ms minimum from 24 through 50 mm/s. Raising the ceiling above 24 therefore does not further shorten the horizon or guarantee faster tracking; the 50 mm/s setting is an upper bound, not a commanded constant speed. If the nominal horizon violates joint speed/acceleration limits, the planner tries longer horizons up to 500 ms while preserving incoming velocity/acceleration and the endpoint. Every candidate must pass the unchanged motion bounds, and the chosen curve must pass geometry checks. If no valid curve exists, control still stops. Planned and transmitted durations match. Endpoint advance stays at most 1.5 mm, and outstanding planned motion stays at most 2 mm. Actual speed can be lower because of joint limits, controller speed scaling, planning latency and repeated endpoint blending. A 10× ceiling (120 mm/s) is rejected; it has not been commissioned.
+
+- Workspace radius: `--budget-mm`; general default 100 mm. Local parser accepts 10–5000 mm, but geometric checks still apply; this range is not a validated physical workspace.
+- Translation ratio: `--scale`; general launcher default 0.75. Local parser accepts 0.1–100; larger gains are not commissioned by the speed change.
+- Nominal speed ceiling: `--speed-mm-s`, 1–50 mm/s, default 12; joint speed 0.08 rad/s and acceleration 0.8 rad/s².
 - Nominal outstanding motion bound remains 2 mm, with endpoint advance <=1.5 mm.
 - Session duration defaults to ten minutes; `--timeout-min` accepts up to 60.
 - Physical force feedback and RCM remain disabled.
@@ -45,4 +55,4 @@ The planner runs in a separate process. Late results are discarded, not sent. Re
 - **Workspace boundary:** move the hand inward. Releasing does not relocate the boundary.
 - **Proximity/geometry fault:** stop and inspect the posture and surrounding clearance. Do not disable the pair check to continue.
 
-Local evidence is written under `diagnostics/real-robot/` and is not part of the public repository. Smooth physical response was reported for the interpolation/clock correction; the process-worker update and larger preset still require a supervised physical recheck.
+Local evidence is written under `diagnostics/real-robot/` and is not part of the public repository. Smooth physical response was reported for the interpolation/clock correction; the process-worker update, larger preset and adjustable speed still require a supervised physical recheck. Offline tests cover speed rejection, curve timing/bounds, faster repeated tracking and release/re-engagement; they do not establish physical stopping performance.

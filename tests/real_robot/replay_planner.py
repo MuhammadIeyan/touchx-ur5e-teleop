@@ -18,6 +18,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('record',type=Path)
     p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--speed-mm-s',type=float,default=12.)
     args=p.parse_args()
     rows=[json.loads(line) for line in args.record.read_text().splitlines()]
     origin=next(row for row in rows if row['event']=='fixed_session_origin')
@@ -32,7 +33,8 @@ def main():
                     manifest['robot_ipv4'],np.array(origin['q'])).result(timeout=15)
         for goal in goals:
             request=dict(reference=tuple(np.array(goal[k]) for k in ('start','velocity','acceleration')),
-                         target=np.array(goal['target']),origin=np.array(origin['pose']),workspace_m=.1)
+                         target=np.array(goal['target']),origin=np.array(origin['pose']),workspace_m=.1,
+                         speed_mm_s=args.speed_mm_s)
             started=time.monotonic();future=pool.submit(planning.plan,request)
             callbacks=0
             while not future.done():
@@ -42,6 +44,7 @@ def main():
                 time.sleep(.005)
             result=future.result()
             results.append(dict(sequence=goal['sequence'],worker_ms=result['planning_s']*1000,
+                                duration_s=result['duration_s'],
                                 elapsed_ms=(time.monotonic()-started)*1000,main_polls=callbacks))
     values=[row['elapsed_ms'] for row in results]
     report=dict(record=str(args.record),count=len(results),median_ms=float(np.median(values)),

@@ -30,13 +30,16 @@ class LoopTests(unittest.TestCase):
     def test_worker_delay_does_not_block_release_or_reengagement(self):
         self.run_tracking(0.,0.,1.,planner_delay=.06)
 
+    def test_faster_horizon_keeps_release_and_reengagement(self):
+        self.run_tracking(.04,.02,1.,speed_mm_s=20.)
+
     def test_expired_worker_results_never_command_motion(self):
         self.run_tracking(0.,0.,1.,planner_delay=.12,expected_fault='Three planning deadlines missed')
 
     def test_hung_worker_stops_without_commanding_motion(self):
         self.run_tracking(0.,0.,1.,planner_delay=.6,expected_fault='Planner worker stalled')
 
-    def run_tracking(self,feedback_delay,delivery_delay,scaling,planner_delay=0.,expected_fault=None):
+    def run_tracking(self,feedback_delay,delivery_delay,scaling,planner_delay=0.,expected_fault=None,speed_mm_s=12.):
         root=Path(__file__).resolve().parents[2]
         xml=xacro.process_file('/opt/ros/humble/share/ur_description/urdf/ur.urdf.xacro',mappings={
             'ur_type':'ur5e','name':'ur','kinematics_params':str(NOMINAL_KINEMATICS)}).toxml()
@@ -64,7 +67,9 @@ class LoopTests(unittest.TestCase):
                    else (obj.q.copy(),np.zeros(6),np.zeros(6)))
             if world.handle is not None and not world.handle.result.done():
                 world.handle.result.set_result(SimpleNamespace(status=5,result=SimpleNamespace(error_code=0)))
-            world.curve=Quintic(*prior,endpoint.positions)
+            duration=endpoint.time_from_start.sec+endpoint.time_from_start.nanosec/1e9
+            self.assertAlmostEqual(duration,.30*12/speed_mm_s)
+            world.curve=Quintic(*prior,endpoint.positions,duration=duration)
             continuity.append(max(np.max(np.abs(prior[i]-world.curve.sample(0)[i])) for i in range(3)))
             world.start=clock[0];world.handle=Handle()
             future.set_result(world.handle)
@@ -80,7 +85,7 @@ class LoopTests(unittest.TestCase):
             reference_stamp=-1,touch=SimpleNamespace(axes=[0.,0.,0.,0.,0.,0.,1.],buttons=[0,0,1,0]),
             controllers=[SimpleNamespace(name=CONTROLLER,state='active')],activated_here=True,
             clutch=Clutch(scale=.5,rot_scale=0),action=SimpleNamespace(server_is_ready=lambda:True,send_goal_async=send),
-            plan_generation=0,expired_plans=0,planning=None,planner_notify=SimpleNamespace(trigger=Mock()),
+            plan_generation=0,expired_plans=0,planning=None,speed_mm_s=speed_mm_s,planner_notify=SimpleNamespace(trigger=Mock()),
             fault=None,fail=lambda reason:faults.append(reason))
         def submit(function,request):
             future=Future()

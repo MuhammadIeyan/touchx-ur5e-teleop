@@ -19,12 +19,14 @@ import rclpy
 
 from real_robot.bench_step import BenchStep,CONTROLLER,main as run_step
 from real_robot import planning
+from real_robot.motion_profile import MotionProfile,duration_nanoseconds
 from real_robot.smooth_control import HoldGesture,ActionWindow
 
 
 class Continuous(BenchStep):
+    speed_mm_s=12.0
     workspace_m=.1
-    motion_scale=.75
+    motion_scale=2
 
     def __init__(self,*args,**kwargs):
         if 'UR5E_GUARD_FD' not in os.environ:raise RuntimeError('Independent guard required')
@@ -58,7 +60,8 @@ class Continuous(BenchStep):
         for topic in ('controller_state','state'):
             self.create_subscription(JointTrajectoryControllerState,f'/{CONTROLLER}/{topic}',self.controller_state,1)
         self.log('smooth_configuration',workspace_radius_m=self.workspace_m,scale=self.motion_scale,
-                 refresh_s=.05,horizon_s=.30,max_outstanding_displacement_m=.002,rcm_enabled=False)
+                 refresh_s=.05,horizon_s=MotionProfile(self.speed_mm_s).duration_s,
+                 speed_limit_mm_s=self.speed_mm_s,max_outstanding_displacement_m=.002,rcm_enabled=False)
 
     def status(self,text):
         if text!=self.last_status:
@@ -277,7 +280,7 @@ class Continuous(BenchStep):
             if np.linalg.norm(delta)<.00002 and np.max(np.abs(v))<.0001:return
             request=dict(reference=tuple(x.copy() for x in self.reference),
                 reference_at=self.reference_at,reference_stamp=self.reference_stamp,
-                target=target.copy(),origin=self.origin.copy(),workspace_m=self.workspace_m,
+                target=target.copy(),origin=self.origin.copy(),workspace_m=self.workspace_m,speed_mm_s=self.speed_mm_s,
                 generation=self.plan_generation,submitted_at=now)
             try:self.planning=(self.planner.submit(planning.plan,request),request)
             except Exception as error:self.fail(f'Planner worker unavailable: {error}');return
@@ -311,7 +314,7 @@ class Continuous(BenchStep):
         # Supply only the future endpoint: open_loop_control + splines blends
         # from the controller's last commanded q/v/a at the real handoff time.
         point=JointTrajectoryPoint(positions=end.tolist(),velocities=[0.]*6,accelerations=[0.]*6)
-        point.time_from_start.nanosec=300000000
+        point.time_from_start.nanosec=duration_nanoseconds(result['duration_s'])
         goal.trajectory.points.append(point)
         goal.path_tolerance=[JointTolerance(name=n,position=.01) for n in self.model.names]
         goal.goal_tolerance=[JointTolerance(name=n,position=.001,velocity=.01) for n in self.model.names]
@@ -321,7 +324,8 @@ class Continuous(BenchStep):
         future.add_done_callback(lambda f:self.accept_stream(seq,f))
         self.log('rolling_goal',sequence=seq,start=q.tolist(),velocity=v.tolist(),acceleration=a.tolist(),
                  reference_stamp_ns=request['reference_stamp'],reference_age_s=time.monotonic()-request['reference_at'],
-                 end=end.tolist(),target=request['target'].tolist(),controller_blended=True)
+                 end=end.tolist(),target=request['target'].tolist(),controller_blended=True,
+                 duration_s=result['duration_s'],speed_limit_mm_s=request['speed_mm_s'])
 
     def stop_and_wait(self):
         self.closing=True
@@ -337,19 +341,23 @@ class Continuous(BenchStep):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--speed-mm-s',type=float,default=12.,help='Physical speed setting, 1–50 mm/s (default 12)')
     parser.add_argument('--session',help='Deprecated; continuous control uses the commissioned setup')
     parser.add_argument('--budget-mm',type=float,default=100.,help='Fixed workspace radius, never auto-rebased')
-    parser.add_argument('--scale',type=float,default=.75,help='Robot/hand displacement ratio (0.1–1.0)')
+    parser.add_argument('--scale',type=float,default=1.0,help='Robot/hand displacement ratio (0.1–100.0)')
     parser.add_argument('--step-mm',type=float,default=None,help='Legacy argument; fixed-size steps are no longer used')
     parser.add_argument('--mode',choices=['position'],default='position')
     parser.add_argument('--timeout-min',type=float,default=10.)
     args=parser.parse_args()
+    try:MotionProfile(args.speed_mm_s)
+    except ValueError as error:parser.error(str(error))
+    Continuous.speed_mm_s=args.speed_mm_s
     if args.step_mm is not None:
         print('Ignoring legacy --step-mm: smooth tracking follows the requested displacement.',flush=True)
-    if not np.isfinite(args.budget_mm) or not 10<=args.budget_mm<=200:parser.error('Workspace must be 10–200 mm')
+    if not np.isfinite(args.budget_mm) or not 10<=args.budget_mm<=5000:parser.error('Workspace must be 10–5000 mm')
     if not np.isfinite(args.timeout_min) or not 0<args.timeout_min<=60:parser.error('Timeout must be 0–60 minutes')
     if args.session:print('Using commissioned setup; no daily session record is required.',flush=True)
-    if not np.isfinite(args.scale) or not .1<=args.scale<=1.:parser.error('Scale must be 0.1–1.0')
+    if not np.isfinite(args.scale) or not .1<=args.scale<=100.:parser.error('Scale must be 0.1–100.0')
     Continuous.motion_scale=args.scale
     Continuous.workspace_m=args.budget_mm/1000
     run_step(['--execute-one-step'],node_type=Continuous,timeout_s=args.timeout_min*60,commissioned_setup=True)
